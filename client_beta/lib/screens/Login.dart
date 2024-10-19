@@ -1,8 +1,53 @@
 // ignore_for_file: prefer_const_constructors
-
+import 'package:client_beta/main.dart';
+import 'package:client_beta/screens/TestData.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 class Login extends StatelessWidget {
+  final TextEditingController _usernameController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+
+  Future<void> _login(BuildContext context) async {
+    final username = _usernameController.text;
+    final password = _passwordController.text;
+
+    try {
+      final response = await http.post(
+        Uri.parse('http://localhost:3000/auth/login'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'username': username,
+          'password': password,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        String token = data['access_token'];
+        // Lưu token, điều hướng người dùng đến trang chính hoặc thực hiện các bước tiếp theo.
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => DataScreen(), // Thay thế bằng widget bạn muốn
+          ),
+        );
+      } else {
+        // Hiển thị thông báo lỗi nếu đăng nhập thất bại
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Login failed. Please check your credentials.')),
+        );
+      }
+    } catch (error) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('An error occurred. Please try again later.')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
