@@ -1,8 +1,12 @@
+import 'package:client_beta/services/api_service.dart';
 import 'package:client_beta/services/token_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+
+import 'package:jwt_decoder/jwt_decoder.dart';
 
 class Disease extends StatefulWidget {
   @override
@@ -13,10 +17,14 @@ class _DiseaseState extends State<Disease> {
   List<dynamic> diseases = [];
   List<bool> isExpandedList = []; // Danh sách trạng thái mở rộng cho từng khung
   final tokenService = TokenService();
+  final storage = FlutterSecureStorage();
+  String userId = '';
+  String diseaseId = '';
 
   @override
   void initState() {
     super.initState();
+    fetchUserInfo();
     fetchDiseases();
   }
 
@@ -42,15 +50,42 @@ class _DiseaseState extends State<Disease> {
     }
   }
 
+  Future<void> fetchUserInfo() async {
+    String? token = await tokenService.getValidAccessToken();
+    if (token == null) {
+      throw Exception('No token found');
+    }
+    final response = await http.get(
+      Uri.parse('${dotenv.env['LOCALHOST']}/user/id'),
+      headers: {
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      try {
+        final userIdInfo = json.decode(response.body);
+        setState(() {
+          userId = userIdInfo['userId'];
+        });
+      } catch (e) {
+        print('Error decoding JSON: $e');
+      }
+    } else {
+      print('Failed to load user info');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Bệnh của bạn là ?'),
+        title: Text('Bệnh của bạn là ? '),
       ),
       body: ListView.builder(
         itemCount: diseases.length,
         itemBuilder: (context, index) {
+          diseaseId = diseases[index]['_id'];
           // Tạo một mảng các màu sắc để áp dụng cho các khung
           List<Color> boxColors = [
             Colors.blueAccent,
@@ -145,12 +180,96 @@ class _DiseaseState extends State<Disease> {
             IconButton(
               icon: Icon(Icons.edit),
               onPressed: () {
-                // Hành động tương tác của nút
+                _showAnswerDialog(entry.key, entry.value);
               },
             ),
           ],
         ),
       );
     }).toList();
+  }
+
+  void _showAnswerDialog(String questionId, String questionText) async {
+    final TextEditingController answerController = TextEditingController();
+    bool isExistingAnswer =
+        false; // Biến để kiểm tra xem có câu trả lời hay không
+
+    try {
+      // Lấy câu trả lời nếu đã tồn tại
+      String previousAnswer = await ApiService('${dotenv.env['LOCALHOST']}')
+          .getExistingAnswer(userId, diseaseId, questionId);
+
+      if (previousAnswer.isNotEmpty) {
+        //   // Nếu có câu trả lời, điền vào khung trả lời và thiết lập trạng thái là đã tồn tại
+        answerController.text = previousAnswer;
+        isExistingAnswer = true;
+      }
+
+      showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            title: Text('Nhập câu trả lời cho: $questionText'),
+            content: TextField(
+              controller: answerController,
+              decoration: InputDecoration(hintText: 'Nhập câu trả lời của bạn'),
+            ),
+            actions: [
+              TextButton(
+                child: Text('Hủy'),
+                onPressed: () {
+                  Navigator.of(context).pop(); // Đóng dialog
+                },
+              ),
+              TextButton(
+                child: Text('Xác nhận'),
+                onPressed: () async {
+                  String answer = answerController.text;
+
+                  if (answer.isNotEmpty) {
+                    try {
+                      if (isExistingAnswer) {
+                        // Nếu câu trả lời đã tồn tại, cập nhật nó
+                        await ApiService('${dotenv.env['LOCALHOST']}')
+                            .updateAnswer(
+                                userId, diseaseId, questionId, answer);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                              content: Text('Câu trả lời đã được cập nhật!')),
+                        );
+                      } else {
+                        // Nếu chưa có, tạo mới
+                        await ApiService('${dotenv.env['LOCALHOST']}')
+                            .createAnswer(
+                                questionId, answer, userId, diseaseId);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Câu trả lời đã được lưu!')),
+                        );
+                      }
+
+                      Navigator.of(context)
+                          .pop(); // Đóng dialog sau khi hoàn tất
+                    } catch (e) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                            content: Text('Lỗi khi xử lý câu trả lời: $e')),
+                      );
+                    }
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Vui lòng nhập câu trả lời.')),
+                    );
+                  }
+                },
+              ),
+            ],
+          );
+        },
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Lỗi khi kiểm tra câu trả lời: $e')),
+      );
+    }
   }
 }

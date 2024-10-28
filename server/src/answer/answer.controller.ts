@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Param, Body, Query } from '@nestjs/common';
+import { Controller, Post, Get, Param, Body, Query, Put, Delete } from '@nestjs/common';
 import { AnswerService } from './answer.service';
 import { Answer } from '../schema/answer.schema';
 
@@ -27,4 +27,33 @@ export class AnswerController {
   ) {
     return this.AnswerService.getAnswerByIds(userID, diseaseID, questionID);
   }
+
+  @Put('update')
+   async update(
+   @Query('userID') userID: string,
+   @Query('diseaseID') diseaseID: string,
+   @Query('questionID') questionID: string,
+   @Body() updateData: Partial<Answer>
+   ) {
+   return this.AnswerService.updateAnswer(userID, diseaseID, questionID, updateData);
+   }
+
+   @Delete('delete')
+   async delete(
+   @Query('userID') userID: string,
+   @Query('diseaseID') diseaseID: string,
+   @Query('questionID') questionID: string
+   ) {
+   return this.AnswerService.deleteAnswer(userID, diseaseID, questionID);
+   }
+
+   @Get('check')
+   async isAnswered(
+     @Query('userID') userID: string,
+     @Query('diseaseID') diseaseID: string,
+     @Query('questionID') questionID: string,
+   ) {
+     const isAnswered = await this.AnswerService.checkAnswer(userID, diseaseID, questionID);
+     return { answered: isAnswered };
+   }
 }

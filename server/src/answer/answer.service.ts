@@ -26,6 +26,36 @@ export class AnswerService {
     diseaseID: string,
     questionID: string,
   ): Promise<Answer | null> {
-    return this.AnswerModel.findOne({ userID, diseaseID, questionID }).exec();
+    return (await this.AnswerModel.findOne({ userID, diseaseID, questionID }).select('answer').exec());
   }
+
+  async updateAnswer(
+   userID: string,
+   diseaseID: string,
+   questionID: string,
+   updateData: Partial<Answer>
+   ): Promise<Answer | null> {
+      return this.AnswerModel.findOneAndUpdate(
+      { userID, diseaseID, questionID },
+      updateData,
+      { new: true } // Trả về tài liệu đã được cập nhật
+      ).exec();
+   }
+
+   async deleteAnswer(
+      userID: string,
+      diseaseID: string,
+      questionID: string
+    ): Promise<Answer | null> {
+      return this.AnswerModel.findOneAndDelete({ userID, diseaseID, questionID }).exec();
+    }
+
+    async checkAnswer(
+      userID: string,
+      diseaseID: string,
+      questionID: string,
+    ): Promise<boolean> {
+      const answer = await this.AnswerModel.findOne({ userID, diseaseID, questionID }).exec();
+      return !!answer; // Trả về true nếu tồn tại, false nếu không
+    }
 }

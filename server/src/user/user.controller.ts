@@ -22,6 +22,12 @@ export class UserController {
    async getAllUsers(): Promise<User[]> {
       return this.userService.findAll();
    }
+   @Get('id')
+   async getCurrentUserId(@Req() req: Request) {
+    // Lấy user từ request đã được giải mã thông qua JWT Guard
+    const user: any = req.user; // user đã được xác thực
+    return { userId: user.id }; // Trả về ID người dùng
+}
 
    // Update
    @Put('update')
